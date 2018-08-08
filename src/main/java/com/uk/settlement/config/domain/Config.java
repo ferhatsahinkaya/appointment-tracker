@@ -15,6 +15,13 @@ public class Config {
     @SerializedName("polling-details")
     private PollingDetails pollingDetails;
 
+    @SerializedName("email-details")
+    private EmailDetails emailDetails;
+
+    public EmailDetails emailDetails() {
+        return emailDetails;
+    }
+
     public LoginDetails loginDetails() {
         return loginDetails;
     }
@@ -25,6 +32,36 @@ public class Config {
 
     public PollingDetails pollingDetails() {
         return pollingDetails;
+    }
+
+    public class EmailDetails {
+        @SerializedName("sender-username")
+        private String senderUsername;
+
+        @SerializedName("sender-password")
+        private String senderPassword;
+
+        @SerializedName("recipient-email-addresses")
+        private String[] recipientEmailAddresses;
+
+        @SerializedName("subject")
+        private String subject;
+
+        public String senderUsername() {
+            return senderUsername;
+        }
+
+        public String senderPassword() {
+            return senderPassword;
+        }
+
+        public String[] recipientEmailAddresses() {
+            return recipientEmailAddresses;
+        }
+
+        public String subject() {
+            return subject;
+        }
     }
 
     public class PollingDetails {
