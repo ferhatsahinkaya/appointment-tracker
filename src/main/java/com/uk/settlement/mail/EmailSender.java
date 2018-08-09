@@ -6,8 +6,10 @@ import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Session;
 import javax.mail.Transport;
+import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+import java.util.Arrays;
 import java.util.Properties;
 
 import static javax.mail.Session.getDefaultInstance;
@@ -38,18 +40,11 @@ public class EmailSender {
         MimeMessage message = new MimeMessage(session);
 
         try {
-            message.setFrom(new InternetAddress(senderUsername));
+            message.setFrom(EmailSender.toInternetAddress(senderUsername));
 
-            InternetAddress[] toAddresses = new InternetAddress[recipientEmailAddresses.length];
-
-            // To get the array of addresses
-            for (int i = 0; i < recipientEmailAddresses.length; i++) {
-                toAddresses[i] = new InternetAddress(recipientEmailAddresses[i]);
-            }
-
-            for (final InternetAddress toAddress : toAddresses) {
-                message.addRecipient(Message.RecipientType.TO, toAddress);
-            }
+            Arrays.stream(recipientEmailAddresses)
+                    .map(EmailSender::toInternetAddress)
+                    .forEach(address -> addRecipient(message, address));
 
             message.setSubject(config.emailDetails().subject());
             message.setText(body);
@@ -57,8 +52,25 @@ public class EmailSender {
             transport.connect(host, senderUsername, senderPassword);
             transport.sendMessage(message, message.getAllRecipients());
             transport.close();
-        } catch (MessagingException me) {
-            me.printStackTrace();
+
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void addRecipient(final MimeMessage message, final InternetAddress address) {
+        try {
+            message.addRecipient(Message.RecipientType.TO, address);
+        } catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static InternetAddress toInternetAddress(final String emailAddress) {
+        try {
+            return new InternetAddress(emailAddress);
+        } catch (AddressException e) {
+            throw new RuntimeException(e);
         }
     }
 }

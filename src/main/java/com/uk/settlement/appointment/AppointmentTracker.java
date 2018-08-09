@@ -1,4 +1,4 @@
-package com.uk.settlement.core;
+package com.uk.settlement.appointment;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -21,7 +21,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-import static com.uk.settlement.config.reader.JsonConfigReader.readConfig;
 import static java.time.Instant.now;
 import static java.time.LocalDateTime.parse;
 import static java.util.Map.Entry.comparingByKey;
@@ -35,10 +34,15 @@ public class AppointmentTracker {
                     (JsonDeserializer<LocalDateTime>) (json, type, jsonDeserializationContext) ->
                             parse(json.getAsJsonPrimitive().getAsString()))
             .create();
+    private final Config config;
+    private final EmailSender emailSender;
 
-    public static void main(String[] args) {
-        Config config = readConfig("config.json", Config.class);
+    public AppointmentTracker(final Config config) {
+        this.config = config;
+        this.emailSender = new EmailSender(config);
+    }
 
+    public void start() {
         System.setProperty("webdriver.gecko.driver", config.webDriverDetails().path());
 
         WebDriver driver = new FirefoxDriver();
@@ -58,7 +62,6 @@ public class AppointmentTracker {
                 .pollingEvery(Duration.of(config.pollingDetails().frequency(), config.pollingDetails().frequencyUnit()))
                 .ignoring(NoSuchElementException.class);
 
-        EmailSender emailSender = new EmailSender(config);
         try {
             wait.until(d -> {
                 d.navigate().refresh();
