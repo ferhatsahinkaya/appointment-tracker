@@ -7,7 +7,6 @@ import com.uk.settlement.config.domain.Config;
 import com.uk.settlement.domain.Appointment;
 import com.uk.settlement.mail.EmailSender;
 import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -20,12 +19,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
-import static java.time.Instant.now;
 import static java.time.LocalDateTime.parse;
 import static java.util.Map.Entry.comparingByKey;
 import static java.util.stream.Collectors.groupingBy;
-import static javax.swing.JOptionPane.showMessageDialog;
 
 public class AppointmentTracker {
 
@@ -49,32 +47,34 @@ public class AppointmentTracker {
 
         driver.get(config.loginDetails().url());
 
-//        WebElement password = driver.findElement(By.id("password"));
-//        password.sendKeys(config.loginDetails().password());
+        WebElement password = driver.findElement(By.id("password"));
+        password.sendKeys(config.loginDetails().password());
 
-//        WebElement submit = driver.findElement(By.id("submit"));
-//        submit.click();
+        WebElement submit = driver.findElement(By.id("submit"));
+        submit.click();
 
         (new WebDriverWait(driver, 10)).until(d -> d.getTitle().contains("Choose an appointment"));
 
         Wait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(Duration.of(config.pollingDetails().timeout(), config.pollingDetails().timeoutUnit()))
                 .pollingEvery(Duration.of(config.pollingDetails().frequency(), config.pollingDetails().frequencyUnit()))
-                .ignoring(NoSuchElementException.class);
+                .ignoring(RuntimeException.class);
+
+        final AtomicReference<String> lastAppointments = new AtomicReference<>("");
 
         try {
             wait.until(d -> {
                 d.navigate().refresh();
 
                 final List<WebElement> appointments = d.findElements(By.name("appointment"));
-                final Map<LocalDate, List<Appointment>> value = appointments
+                final Map<LocalDate, List<Appointment>> groupedAppointments = appointments
                         .stream()
                         .map(c -> c.getAttribute("value"))
                         .map(c -> GSON.fromJson(c, Appointment.class))
                         .collect(groupingBy(appointment -> appointment.startTime().toLocalDate()));
 
                 StringBuilder builder = new StringBuilder();
-                value.entrySet()
+                groupedAppointments.entrySet()
                         .stream()
                         .sorted(comparingByKey())
                         .forEach(appointment -> {
@@ -84,17 +84,21 @@ public class AppointmentTracker {
                                     .getValue()
                                     .forEach(appt -> builder
                                             .append(appt.startTime().toLocalTime())
-                                            .append("(")
+                                            .append(" (")
                                             .append(appt.calendarType())
                                             .append(")")
                                             .append("\n"));
                             builder.append("\n");
                         });
-                emailSender.sendEmail(builder.toString());
 
-                return true;
+                final String availableAppointments = builder.toString();
+
+                if (!lastAppointments.get().equals(availableAppointments)) {
+                    emailSender.sendEmail(builder.toString());
+                    lastAppointments.set(availableAppointments);
+                }
+                throw new RuntimeException();
             });
-            showMessageDialog(null, String.format("Appointment(s) found by %s", now()));
         } finally {
             driver.quit();
         }
